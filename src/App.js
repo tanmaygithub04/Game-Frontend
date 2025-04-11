@@ -1,24 +1,38 @@
-import logo from './logo.svg';
 import './App.css';
+import Game from './components/Game';
+import UserRegistration from './components/UserRegistration';
+import { UserProvider, useUser } from './UserContext';
+
+// Define a simple LoadingIndicator component
+function LoadingIndicator() {
+  return (
+    <div className="loading-indicator">
+      <div className="loading-spinner"></div>
+      <p>Waking up the server...</p>
+    </div>
+  );
+}
+
+function AppContent() {
+  const { user, loading: userLoading } = useUser(); // Rename loading to avoid conflict
+
+  // Display loading indicator if user context is loading
+  if (userLoading) {
+    return <LoadingIndicator />;
+  }
+
+  return (
+    <div className="App">
+      {!user ? <UserRegistration /> : <Game />}
+    </div>
+  );
+}
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <UserProvider>
+      <AppContent />
+    </UserProvider>
   );
 }
 

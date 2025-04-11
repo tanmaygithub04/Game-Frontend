@@ -1,70 +1,104 @@
-# Getting Started with Create React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# Globetrotter: Technical Documentation
 
-## Available Scripts
+## System Architecture
 
-In the project directory, you can run:
+Globetrotter employs a classic client-server architecture with modern React frontend and Express backend:
 
-### `npm start`
+### Frontend (React.js)
+- **State Management**: Context API with custom hooks
+- **Component Structure**: Functional components with React hooks
+- **Network**: Optimized fetch API calls with throttling, caching, and visibility detection
+- **Performance**: Conditional rendering and memoization techniques
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Backend (Express.js)
+- **Data Storage**: In-memory Maps for user sessions and party management
+- **API Design**: RESTful endpoints for game mechanics, user management, and social features
+- **State Persistence**: Session-based with challenge link sharing capabilities
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Technical Implementation Highlights
 
-### `npm test`
+### 1. Adaptive Polling with Visibility API
+```javascript
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (user?.partyId) fetchPartyInfo(user.partyId);
+    startPolling();
+  } else {
+    stopPolling();
+  }
+});
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 2. Request Throttling & Cache Implementation
+```javascript
+// Simple caching mechanism with timestamp validation
+const now = Date.now();
+const lastFetchTime = partyCache.current[partyId] || 0;
+const timeSinceLastFetch = now - lastFetchTime;
 
-### `npm run build`
+if (timeSinceLastFetch < 5000 && !forced) {
+  console.log(`Skipping party fetch - last fetch was ${timeSinceLastFetch}ms ago`);
+  return party;
+}
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 3. Cryptographic Challenge Generation
+```javascript
+const challengeId = crypto.randomBytes(8).toString('hex');
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 4. Two-Phase Party Joining Protocol
+```javascript
+// First get the party creator's info
+const challengeResponse = await fetch(`${API_URL}/api/users/challenge/${challengeId}`);
+// Then register with the party ID
+const response = await fetch(`${API_URL}/api/users/register`, {/*...*/});
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## API Endpoints
 
-### `npm run eject`
+| Endpoint | Method | Description | Parameters |
+|----------|--------|-------------|------------|
+| `/api/destinations/random` | GET | Fetches randomized geography question | None |
+| `/api/destinations/answer` | POST | Validates user answer | `destinationId`, `userAnswer` |
+| `/api/users/register` | POST | Creates/retrieves user | `username`, `partyId` (optional) |
+| `/api/users/challenge/:challengeId` | GET | Retrieves challenge info | `challengeId` in URL |
+| `/api/parties/:partyId` | GET | Gets party information | `partyId` in URL |
+| `/api/users/:username/score` | PUT | Updates user score | `correct` (boolean) |
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Performance Optimizations
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+1. **Reduced Network Traffic**: 
+   - Polling frequency reduced from 5s → 10s
+   - Request throttling with 5s window
+   - Page visibility integration
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+2. **Error Handling & Fault Tolerance**:
+   - Comprehensive error middleware
+   - JSON error responses
+   - Request retry mechanism
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+3. **Memory Management**:
+   - Reference cleanup in component unmounting
+   - Timeout/interval management
+   - Concurrent request prevention
 
-## Learn More
+## Code Organization
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Game.js       # Main game logic
+│   │   │   ├── Options.js    # Answer selection interface
+│   │   │   ├── Party.js      # Multiplayer interface
+│   │   │   └── ...
+│   │   ├── UserContext.js    # Auth & session management
+│   │   └── ...
+└── backend/
+    ├── server.js             # Express server & API endpoints
+    └── data.json             # Geography quiz data
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+This architecture follows separation of concerns and modern React practices while maintaining a lightweight footprint appropriate for a geography quiz game.
