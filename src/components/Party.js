@@ -29,14 +29,6 @@ function Party() {
     return a.score.incorrect - b.score.incorrect;
   });
 
-  // Find the current user's rank
-  const currentUserRank = sortedMembers.findIndex(
-    member => member.username === user?.username
-  ) + 1;
-
-  // We can use currentUserRank in the component if needed
-  // For now just log it or uncomment the line below to use it
-  // console.log('Current user rank:', currentUserRank);
 
   return (
     <div className="party-container">

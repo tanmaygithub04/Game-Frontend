@@ -10,31 +10,13 @@ import { useUser } from '../UserContext';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 function Game() {
-  const { user, registerUser, updateUserScore, party, fetchPartyInfo } = useUser();
+  const { user, updateUserScore, party, fetchPartyInfo } = useUser();
   const [destination, setDestination] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Check for existing session only once on mount
-  useEffect(() => {
-    const checkSession = async () => {
-      const storedUser = sessionStorage.getItem('globetrotter_user');
-      if (storedUser && !user) {
-        try {
-          const userData = JSON.parse(storedUser);
-          await registerUser(userData.username);
-        } catch (e) {
-          console.error("Failed to parse stored user data", e);
-          sessionStorage.removeItem('globetrotter_user');
-        }
-      }
-    };
-    
-    checkSession();
-  }, [registerUser, user]);
-
   // Set up party data refresh
   useEffect(() => {
     if (!user?.partyId) return;

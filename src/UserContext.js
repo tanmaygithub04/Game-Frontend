@@ -8,7 +8,7 @@ const UserContext = createContext();
 // Provider component
 export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [challengeUser, setChallengeUser] = useState(null);
   const [party, setParty] = useState(null);
@@ -19,22 +19,63 @@ export const UserProvider = ({ children }) => {
   const activeFetchTimeout = useRef(null);
   const partyCache = useRef({});
   
-  // Check for challenge in URL
+  // Check for session and challenge in URL on initial mount
   useEffect(() => {
-    // Only check for challenge, don't restore user from localStorage
-    const urlParams = new URLSearchParams(window.location.search);
-    const challengeId = urlParams.get('challenge');
-    if (challengeId) {
-      fetchChallengeUser(challengeId);
-    }
-    
-    // Clean up any active intervals/timeouts on unmount
+    let isMounted = true; // Flag to prevent state updates on unmounted component
+
+    const initializeUser = async () => {
+      setLoading(true); // Ensure loading is true during init
+      let restoredUser = null;
+
+      // 1. Try restoring user from sessionStorage
+      try {
+        const storedUser = sessionStorage.getItem('globetrotter_user');
+        if (storedUser) {
+          restoredUser = JSON.parse(storedUser);
+          console.log("Restored user from session:", restoredUser);
+          if (isMounted) {
+            setUser(restoredUser); // Set user state immediately
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse stored user data", e);
+        sessionStorage.removeItem('globetrotter_user');
+      }
+
+      // 2. Check for challenge in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const challengeId = urlParams.get('challenge');
+
+      // Fetch challenge user only if no user was restored from session
+      // or if the challenge ID requires fetching different user/party info
+      if (challengeId && !restoredUser) { // Modify condition if challenge join should override session
+         try {
+           // We might still need the challenge info even if user is restored,
+           // e.g., to show who challenged them. Let's fetch it regardless for now.
+           await fetchChallengeUser(challengeId);
+         } catch(e) {
+            console.error("Error fetching challenge user during init:", e);
+            // Decide if this error should block loading or clear user etc.
+            // For now, we let it proceed. setError might be set within fetchChallengeUser.
+         }
+      }
+
+      // 3. Finalize loading state
+      if (isMounted) {
+        setLoading(false);
+      }
+    };
+
+    initializeUser();
+
+    // Cleanup function
     return () => {
+      isMounted = false;
       if (activeFetchTimeout.current) {
         clearTimeout(activeFetchTimeout.current);
       }
     };
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   const registerUser = useCallback(async (username) => {
     // Prevent multiple registration attempts
@@ -55,14 +96,15 @@ export const UserProvider = ({ children }) => {
       // If there's a challenge ID, join that party instead of registering normally
       if (challengeId) {
         const result = await joinParty(username, challengeId);
-        registrationInProgress.current = false;
         return result;
       }
       
-      // Check if we already have this user registered
+      // Check if we already have this user registered *IN THE CURRENT CONTEXT*
+      // This check is now more reliable as the context might be pre-populated from session
       if (user && user.username === username) {
-        console.log("User already registered:", username);
-        registrationInProgress.current = false;
+        console.log("User already registered in context:", username);
+        registrationInProgress.current = false; // Ensure flag is reset
+        // Optionally fetch updated user data here if needed, or just return existing user
         return user;
       }
       
@@ -346,7 +388,8 @@ export const UserProvider = ({ children }) => {
       updateUserScore, 
       fetchPartyInfo,
       logout,
-      generateShareUrl
+      generateShareUrl,
+      fetchChallengeUser
     }}>
       {children}
     </UserContext.Provider>
