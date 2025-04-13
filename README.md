@@ -3,9 +3,9 @@
 ## Application Documentation & Overview
 
 Globetrotter is an interactive web application designed as a geography guessing game. Users are presented with clues about a specific destination and must guess the correct location from a set of options.
-Link to Backend Github : https://github.com/tanmaygithub04/Game-Backend
-Link to deployed backend  : https://game-backend-505i.onrender.com ( health route : get '/api/health')
-Link to deployed frontend : https://game-frontend-mu.vercel.app/
+* Link to Backend Github : https://github.com/tanmaygithub04/Game-Backend
+* Link to deployed backend  : https://game-backend-505i.onrender.com ( health route : get '/api/health')
+* Link to deployed frontend : https://game-frontend-mu.vercel.app/
 
 **Core Features:**
 
