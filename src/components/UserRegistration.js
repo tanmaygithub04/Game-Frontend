@@ -1,58 +1,37 @@
 import React, { useState } from 'react';
 import { useUser } from '../UserContext';
-import { FaTrophy, FaUsers, FaUserAlt } from 'react-icons/fa';
+import { FaTrophy } from 'react-icons/fa';
 
 function UserRegistration() {
   const [username, setUsername] = useState('');
-  const { registerUser, loading, error, challengeUser, party } = useUser();
+  const { registerUser, loading, error, challengeUser } = useUser();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (username.trim().length === 0) return;
+    
+    // Trim once and store for efficiency
+    const trimmedUsername = username.trim();
+    if (trimmedUsername.length === 0) return;
+    
     try {
-      await registerUser(username.trim());
+      await registerUser(trimmedUsername);
+      // On success, UserContext updates user state which triggers App.js to show Game component
     } catch (err) {
-      // Error is handled in the context
+      // Error is already handled in the context via setError() - displayed below
     }
   };
 
   // Create a message based on whether we're joining a party or creating a new one
   const getMessage = () => {
     if (challengeUser) {
-      if (party && party.members && party.members.length > 1) {
-        return (
-          <div className="challenge-info">
-            <h3><FaUsers /> Join the Party!</h3>
-            <p>You've been invited to join <strong>{challengeUser.username}</strong>'s party!</p>
-            <p>Currently {party.members.length} players in this game.</p>
-            <div className="party-preview">
-              {party.members.slice(0, 3).map((member, index) => (
-                <div key={index} className="preview-member">
-                  <FaUserAlt className="user-icon" />
-                  <span>{member.username}</span>
-                  <span className="member-score-preview">
-                    {member.score.correct} ✓
-                  </span>
-                </div>
-              ))}
-              {party.members.length > 3 && (
-                <div className="more-members">
-                  +{party.members.length - 3} more
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      } else {
-        return (
-          <div className="challenge-info">
-            <h3><FaTrophy /> Challenge Accepted?</h3>
-            <p>You've been challenged by <strong>{challengeUser.username}</strong>!</p>
-            <p>They have correctly answered {challengeUser.score.correct} questions.</p>
-            <p>Can you beat their score?</p>
-          </div>
-        );
-      }
+      return (
+        <div className="challenge-info">
+          <h3><FaTrophy /> Challenge Accepted?</h3>
+          <p>You've been challenged by <strong>{challengeUser.username}</strong>!</p>
+          <p>They have correctly answered {challengeUser.score.correct} questions.</p>
+          <p>Can you beat their score?</p>
+        </div>
+      );
     } else {
       return (
         <p>Enter your username to start the game:</p>

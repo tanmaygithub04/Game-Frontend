@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Clues from './Clues';
 import Options from './Options';
 import Feedback from './Feedback';
@@ -10,57 +10,77 @@ import { useUser } from '../UserContext';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 function Game() {
-  const { user, updateUserScore, party, fetchPartyInfo } = useUser();
+  const { user, setUser, setParty, fetchPartyInfo, logout } = useUser();
   const [destination, setDestination] = useState(null);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const partyUpdateInterval = useRef(null);
   
   // Set up party data refresh
   useEffect(() => {
-    if (!user?.partyId) return;
+    console.log("Setting up polling with partyID:", user?.partyID);
     
-    fetchPartyInfo(user.partyId);
+    if (!user?.partyID) {
+      console.log("No party ID available, not setting up polling");
+      return;
+    }
     
-    let partyUpdateInterval;
+    // Initial fetch on mount
+    fetchPartyInfo(user.partyID);
+    
+    // Create polling function
     const startPolling = () => {
-      if (partyUpdateInterval) clearInterval(partyUpdateInterval);
-      partyUpdateInterval = setInterval(() => {
-        if (user?.partyId) fetchPartyInfo(user.partyId);
-      }, 10000);
-    };
-    
-    const stopPolling = () => {
-      if (partyUpdateInterval) {
-        clearInterval(partyUpdateInterval);
-        partyUpdateInterval = null;
+      // Clear any existing interval first
+      if (partyUpdateInterval.current) {
+        clearInterval(partyUpdateInterval.current);
       }
+      
+      // Start a new 2-second interval
+      partyUpdateInterval.current = setInterval(() => {
+        if (user?.partyID) {
+          fetchPartyInfo(user.partyID);
+        }
+      }, 5000);
     };
     
+    // Start polling immediately
     startPolling();
     
+    // Visibility change handler - stop polling when hidden, restart when visible
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        if (user?.partyId) fetchPartyInfo(user.partyId);
+        // Immediately fetch fresh data when returning to the tab
+        if (user?.partyID) {
+          fetchPartyInfo(user.partyID, true); // Use forced=true to bypass cache
+        }
         startPolling();
       } else {
-        stopPolling();
+        // Stop polling when tab is inactive
+        if (partyUpdateInterval.current) {
+          clearInterval(partyUpdateInterval.current);
+          partyUpdateInterval.current = null;
+        }
       }
     };
     
+    // Add visibility change listener
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Cleanup on unmount or dependency change
     return () => {
-      stopPolling();
+      if (partyUpdateInterval.current) {
+        clearInterval(partyUpdateInterval.current);
+        partyUpdateInterval.current = null;
+      }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user, fetchPartyInfo]);
+  }, [user?.partyID, fetchPartyInfo]); // Only depend on partyID and fetchPartyInfo
 
   const fetchDestination = async () => {
     setLoading(true);
     setError(null);
     setDestination(null);
-    setSelectedAnswer(null);
     setFeedback(null);
     
     try {
@@ -81,15 +101,24 @@ function Game() {
 
   const handleAnswerSubmit = async (answer) => {
     if (!destination || feedback) return;
+    
+    // Verify user is authenticated before proceeding
+    if (!user || !user.userID) {
+      setError("User session expired. Please log in again.");
+      return;
+    }
 
-    setSelectedAnswer(answer);
     setLoading(true);
 
     try {
       const response = await fetch(`${API_URL}/api/destinations/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ destinationId: destination.id, userAnswer: answer }),
+        body: JSON.stringify({ 
+          destinationId: destination.id, 
+          userAnswer: answer,
+          userID: user.userID
+        }),
       });
       
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -97,10 +126,32 @@ function Game() {
       const result = await response.json();
       setFeedback(result);
       
-      if (user) {
-        updateUserScore(user.username, result.correct);
+      // Update user with returned score
+      if (result.updatedScore) {
+        setUser(prevUser => ({
+          ...prevUser,
+          score: result.updatedScore
+        }));
+        
+        // Update in session storage with error handling
+        try {
+          const storedUser = JSON.parse(sessionStorage.getItem('globetrotter_user'));
+          if (storedUser) {
+            storedUser.score = result.updatedScore;
+            sessionStorage.setItem('globetrotter_user', JSON.stringify(storedUser));
+          }
+        } catch (storageError) {
+          console.error('Failed to update session storage:', storageError);
+          // Non-blocking error - won't affect main functionality
+        }
       }
-    } catch (e) {
+      
+      // If party data was returned, update party state
+      if (result.party) {
+        setParty(result.party);
+      }
+    }
+    catch (e) {
       console.error("Failed to check answer:", e);
       setError("Failed to submit answer. Please try again.");
     } finally {
@@ -127,15 +178,15 @@ function Game() {
             </div>
           </>
         )}
+        <div className="logout-button">
+          <button onClick={logout}>Logout</button>
+        </div>
       </div>
       
       <div className="game-content">
-        {party?.members && (
-          <div className="game-sidebar">
-            <Party />
-          </div>
-        )}
-        
+        <div className="game-sidebar">
+          <Party />
+        </div>
         <div className="game-main">
           {loading && !destination && <p>Loading your next destination...</p>}
           
@@ -148,7 +199,6 @@ function Game() {
                     options={destination.options}
                     onSelect={handleAnswerSubmit}
                     disabled={loading}
-                    selectedAnswer={selectedAnswer}
                   />
                 </div>
               ) : (
@@ -157,7 +207,6 @@ function Game() {
                     isCorrect={feedback.correct}
                     funFact={feedback.funFact}
                     correctAnswer={feedback.correctAnswer}
-                    selectedAnswer={selectedAnswer}
                   />
                 </div>
               )}

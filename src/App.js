@@ -14,9 +14,7 @@ function LoadingIndicator() {
 }
 
 function AppContent() {
-  const { user, loading: userLoading } = useUser(); // Rename loading to avoid conflict
-
-  // Display loading indicator if user context is loading
+  const { user, loading: userLoading } = useUser();
   if (userLoading) {
     return <LoadingIndicator />;
   }
